@@ -5,12 +5,18 @@ from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
+import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--dataset", required=True)
+args = parser.parse_args()
+
+DATASET = args.dataset
 # -----------------------------
 # CHANGE THESE
 # -----------------------------
-IMPUTED_PATH = "exp/dataset_mcar_10_trial1/tabddpm_impute/imputed"
-OUT_FILE = "exp/dataset_mcar_10_trial1/tabddpm_impute/downstream_metrics.json"
+IMPUTED_PATH = f"exp/{DATASET}/tabddpm_impute/imputed"
+OUT_FILE = f"exp/{DATASET}/tabddpm_impute/downstream_metrics.json"
 
 # -----------------------------
 # LOAD DATA

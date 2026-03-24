@@ -4,13 +4,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import entropy, gaussian_kde
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+import argparse
 
 # -----------------------------
 # CHANGE THESE PATHS
 # -----------------------------
-DATASET_PATH = "data/dataset_mcar_10_trial1"
-IMPUTED_PATH = "exp/dataset_mcar_10_trial1/tabddpm_impute/imputed"
-OUT_DIR = "exp/dataset_mcar_10_trial1/tabddpm_impute/eval_imputation"
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--dataset", required=True)
+args = parser.parse_args()
+
+DATASET = args.dataset
+DATASET_PATH = f"data/{DATASET}"
+IMPUTED_PATH = f"exp/{DATASET}/tabddpm_impute/imputed"
+OUT_DIR = f"exp/{DATASET}/tabddpm_impute/eval_imputation"
 
 os.makedirs(OUT_DIR, exist_ok=True)
 
