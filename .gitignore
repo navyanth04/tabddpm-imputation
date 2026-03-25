@@ -1,6 +1,5 @@
 .DS_Store
 __pycache__/
-catboost_info/
 
 # Python
 *.pyc
@@ -14,16 +13,14 @@ catboost_info/
 # data / outputs
 **/**.npy
 **/**.gz
-**/**.csv
-**/**.png
 **/**.tar
 **/**.obj
 **/**.pt
 **/**.pth
+**/**.png
 **/**.ckpt
 
 # scripts / misc
-**/**.sh
 **/**.code-workspace
 
 # experiment outputs
