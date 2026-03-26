@@ -1,99 +1,474 @@
-# TabDDPM: Modelling Tabular Data with Diffusion Models
-This is the official code for our paper "TabDDPM: Modelling Tabular Data with Diffusion Models" ([paper](https://arxiv.org/abs/2209.15421))
 
-<!-- ## Results
-You can view all the results and build your own tables with this [notebook](notebooks/Reports.ipynb). -->
+# TabDDPM Imputation
 
-## Setup the environment
-1. Install [conda](https://docs.conda.io/en/latest/miniconda.html) (just to manage the env).
-2. Run the following commands
-    ```bash
-    export REPO_DIR=/path/to/the/code
-    cd $REPO_DIR
+TabDDPM Imputer is a tabular imputation pipeline for running MCAR missing-value experiments on datasets stored as `dataset_mcar_*_trial*`.
 
-    conda create -n tddpm python=3.9.7
-    conda activate tddpm
+It supports:
 
-    pip install torch==1.10.1+cu111 -f https://download.pytorch.org/whl/torch_stable.html
-    pip install -r requirements.txt
+- building TabDDPM-ready arrays from CSV files
+- creating one config per dataset
+- training the model
+- imputing missing values for `train`, `val`, and `test`
+- evaluating imputation quality
+- evaluating downstream prediction performance
+- summarizing results across trials
 
-    # if the following commands do not succeed, update conda
-    conda env config vars set PYTHONPATH=${PYTHONPATH}:${REPO_DIR}
-    conda env config vars set PROJECT_DIR=${REPO_DIR}
+---
 
-    conda deactivate
-    conda activate tddpm
-    ```
+## Repository structure
 
-## Running the experiments
+```text
+.
+├── data/
+├── exp/
+├── lib/
+├── scripts/
+├── tab_ddpm/
+├── convert_to_tabddpm_impute_from_original.py
+├── evaluate_imputation.py
+├── evaluate_downstream.py
+├── exp.py
+├── run_all_datasets.sh
+├── summarize_trials.py
+└── requirements.txt
 
-Here we describe the neccesary info for reproducing the experimental results.  
-Use `agg_results.ipynb` to print results for all dataset and all methods.
+```
 
-### Datasets
+### Main files
 
-We upload the datasets used in the paper with our train/val/test splits (link below). We do not impose additional restrictions to the original dataset licenses, the sources of the data are listed in the paper appendix. 
+-   `convert_to_tabddpm_impute_from_original.py`  
+    Builds the `.npy` files used by training and imputation.
+    
+-   `exp.py`  
+    Generates `config.toml` for each dataset under `exp/`.
+    
+-   `scripts/pipeline.py`  
+    Starts model training.
+    
+-   `scripts/train.py`  
+    Contains the training loop.
+    
+-   `scripts/impute.py`  
+    Loads a trained model and imputes missing values.
+    
+-   `evaluate_imputation.py`  
+    Computes imputation metrics and KDE plots.
+    
+-   `evaluate_downstream.py`  
+    Runs downstream prediction on the imputed data.
+    
+-   `summarize_trials.py`  
+    Aggregates results across all trials and missing rates.
+    
+-   `run_all_datasets.sh`  
+    Runs the full pipeline automatically for all datasets in `exp/dataset_mcar_*_trial*`.
+    
 
-You could load the datasets with the following commands:
+----------
 
-``` bash
+## Environment setup
+
+Install Conda first, then run:
+
+```bash
+export REPO_DIR=/path/to/tabddpm-imputation
+cd $REPO_DIR
+
+conda create -n tddpm python=3.9.7 -y
 conda activate tddpm
-cd $PROJECT_DIR
-wget "https://www.dropbox.com/s/rpckvcs3vx7j605/data.tar?dl=0" -O data.tar
-tar -xvf data.tar
+
+# Example PyTorch install for CUDA 11.1
+pip install torch==1.10.1+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+
+pip install -r requirements.txt
+pip install matplotlib xgboost
+
+# Optional but convenient
+conda env config vars set PYTHONPATH=${PYTHONPATH}:${REPO_DIR}
+conda env config vars set PROJECT_DIR=${REPO_DIR}
+
+conda deactivate
+conda activate tddpm
+
 ```
 
-### File structure
-`tab-ddpm/` -- implementation of the proposed method  
-`tuned_models/` -- tuned hyperparameters of evaluation model (CatBoost or MLP)
+If you do not want to set env vars, you can still run all commands with `PYTHONPATH=.`.
 
-All main scripts are in `scripts/` folder:
+----------
 
-- `scripts/pipeline.py` are used to train, sample and eval TabDDPM using a given config  
-- `scripts/tune_ddpm.py` -- tune hyperparameters of TabDDPM
-- `scripts/eval_[catboost|mlp|simple].py` -- evaluate synthetic data using a tuned evaluation model or simple models
-- `scripts/eval_seeds.py` -- eval using multiple sampling and multuple eval seeds
-- `scripts/eval_seeds_simple.py` --  eval using multiple sampling and multuple eval seeds (for simple models)
-- `scripts/tune_evaluation_model.py` -- tune hyperparameters of eval model (CatBoost or MLP)
-- `scripts/resample_privacy.py` -- privacy calculation  
+## Expected data layout
 
-Experiments folder (`exp/`):
-- All results and synthetic data are stored in `exp/[ds_name]/[exp_name]/` folder
-- `exp/[ds_name]/config.toml` is a base config for tuning TabDDPM
-- `exp/[ds_name]/eval_[catboost|mlp].json` stores results of evaluation (`scripts/eval_seeds.py`)  
+The pipeline expects:
 
-To understand the structure of `config.toml` file, read `CONFIG_DESCRIPTION.md`.
+```text
+data/
+├── original_complete/
+│   └── oula_complete.csv
+├── dataset_mcar_10_trial1/
+│   └── dataset_mcar_10_trial1.csv
+├── dataset_mcar_10_trial2/
+│   └── dataset_mcar_10_trial2.csv
+...
+├── dataset_mcar_50_trial5/
+│   └── dataset_mcar_50_trial5.csv
 
-Baselines:
-- `smote/`
-- `CTGAN/` -- TVAE [official repo](https://github.com/sdv-dev/CTGAN)
-- `CTAB-GAN/` --  [official repo](https://github.com/Team-TUD/CTAB-GAN)
-- `CTAB-GAN-Plus/` -- [official repo](https://github.com/Team-TUD/CTAB-GAN-Plus)
-
-### Examples
-
-<ins>Run TabDDPM tuning.</ins>   
-
-Template and example (`--eval_seeds` is optional): 
-```bash
-python scripts/tune_ddpm.py [ds_name] [train_size] synthetic [catboost|mlp] [exp_name] --eval_seeds
-python scripts/tune_ddpm.py churn2 6500 synthetic catboost ddpm_tune --eval_seeds
 ```
 
-<ins>Run TabDDPM pipeline.</ins>   
+After conversion, each `data/dataset_mcar_*_trial*/` folder will also contain generated `.npy` files and `info.json`.
 
-Template and example  (`--train`, `--sample`, `--eval` are optional): 
+----------
+
+## Full workflow
+
+## Step 1: build TabDDPM-ready arrays
+
+Run this when:
+
+-   the original CSV changed
+    
+-   the masked CSVs changed
+    
+-   the split logic changed
+    
+-   the feature or mask logic changed
+    
+
 ```bash
-python scripts/pipeline.py --config [path_to_your_config] --train --sample --eval
-python scripts/pipeline.py --config exp/churn2/ddpm_cb_best/config.toml --train --sample
+PYTHONPATH=. python convert_to_tabddpm_impute_from_original.py
+
 ```
-It takes approximately 7min to run the script above (NVIDIA GeForce RTX 2080 Ti).  
 
-<ins>Run evaluation over seeds</ins>   
-Before running evaluation, you have to train the model with the given hyperparameters (the example above).  
+This creates files such as:
 
-Template and example: 
+-   `X_num_train.npy`, `X_num_val.npy`, `X_num_test.npy`
+    
+-   `X_num_train_gt.npy`, `X_num_val_gt.npy`, `X_num_test_gt.npy`
+    
+-   `mask_v_train.npy`, `mask_v_val.npy`, `mask_v_test.npy`
+    
+-   `y_train.npy`, `y_val.npy`, `y_test.npy`
+    
+-   `v_idx.npy`
+    
+-   `info.json`
+    
+
+----------
+
+## Step 2: generate experiment configs
+
 ```bash
-python scripts/eval_seeds.py --config [path_to_your_config] [n_eval_seeds] [ddpm|smote|ctabgan|ctabgan-plus|tvae] synthetic [catboost|mlp] [n_sample_seeds]
-python scripts/eval_seeds.py --config exp/churn2/ddpm_cb_best/config.toml 10 ddpm synthetic catboost 5
+python exp.py
+
+```
+
+This creates one config per dataset, for example:
+
+```text
+exp/dataset_mcar_10_trial1/config.toml
+exp/dataset_mcar_10_trial2/config.toml
+...
+exp/dataset_mcar_50_trial5/config.toml
+
+```
+
+----------
+
+## Step 3: run one dataset manually
+
+Example: `dataset_mcar_10_trial1`
+
+### Train
+
+```bash
+PYTHONPATH=. python scripts/pipeline.py --config exp/dataset_mcar_10_trial1/config.toml --train
+
+```
+
+### Impute train split
+
+```bash
+PYTHONPATH=. python scripts/impute.py --config exp/dataset_mcar_10_trial1/config.toml --split train
+
+```
+
+### Impute validation split
+
+```bash
+PYTHONPATH=. python scripts/impute.py --config exp/dataset_mcar_10_trial1/config.toml --split val
+
+```
+
+### Impute test split
+
+```bash
+PYTHONPATH=. python scripts/impute.py --config exp/dataset_mcar_10_trial1/config.toml --split test
+
+```
+
+### Evaluate imputation
+
+```bash
+PYTHONPATH=. python evaluate_imputation.py --dataset dataset_mcar_10_trial1
+
+```
+
+### Evaluate downstream prediction
+
+```bash
+PYTHONPATH=. python evaluate_downstream.py --dataset dataset_mcar_10_trial1
+
+```
+
+----------
+
+## Step 4: run all datasets automatically
+
+You can use the provided shell script:
+
+```bash
+bash run_all_datasets.sh
+
+```
+
+This runs, in order, for every dataset folder under `exp/dataset_mcar_*_trial*`:
+
+1.  train the model
+    
+2.  impute `train`
+    
+3.  impute `val`
+    
+4.  impute `test`
+    
+5.  evaluate imputation
+    
+6.  evaluate downstream prediction
+    
+
+It also stores:
+
+-   per-dataset logs
+    
+-   a summary file with `OK` / `FAILED`
+    
+-   experiment snapshots
+    
+
+----------
+
+## Step 5: summarize all trial results
+
+After all runs finish:
+
+```bash
+PYTHONPATH=. python summarize_trials.py
+
+```
+
+This creates:
+
+```text
+summary_results/
+├── all_trials_metrics.csv
+├── avg_by_missing_rate.csv
+└── std_by_missing_rate.csv
+
+```
+
+----------
+
+## What `run_all_datasets.sh` does
+
+The script:
+
+-   creates a run folder under `$HOME/imputation_results/tabddpm/`
+    
+-   creates a log directory
+    
+-   creates an experiment snapshot directory
+    
+-   loops over all folders matching `exp/dataset_mcar_*_trial*`
+    
+-   uses each folder’s `config.toml`
+    
+-   runs training, imputation, and both evaluations
+    
+-   saves a separate log for each dataset
+    
+-   writes `summary.txt` and `failed.txt`
+    
+-   copies a snapshot of each finished experiment folder
+    
+
+If you want full control, you can skip the shell script and run the commands manually as shown above.
+
+----------
+
+## Output files
+
+For each dataset, the main experiment output folder is:
+
+```text
+exp/dataset_mcar_xx_trialy/tabddpm_impute/
+
+```
+
+### Training outputs
+
+-   `config.toml`
+    
+-   `info.json`
+    
+-   `loss.csv`
+    
+-   `model.pt`
+    
+-   `model_ema.pt`
+    
+
+### Imputation outputs
+
+Inside:
+
+```text
+exp/dataset_mcar_xx_trialy/tabddpm_impute/imputed/
+
+```
+
+You will find:
+
+-   `X_num_train.npy`
+    
+-   `X_num_val.npy`
+    
+-   `X_num_test.npy`
+    
+-   `X_num_train_full.npy`
+    
+-   `X_num_val_full.npy`
+    
+-   `X_num_test_full.npy`
+    
+-   `y_train.npy`
+    
+-   `y_val.npy`
+    
+-   `y_test.npy`
+    
+-   `info.json`
+    
+
+### Imputation evaluation outputs
+
+Inside:
+
+```text
+exp/dataset_mcar_xx_trialy/tabddpm_impute/eval_imputation/
+
+```
+
+You will find:
+
+-   `imputation_metrics.json`
+    
+-   KDE plot images such as:
+    
+    -   `kde_train_V_1.png`
+        
+    -   `kde_val_V_5.png`
+        
+    -   `kde_test_overall.png`
+        
+
+### Downstream evaluation output
+
+-   `exp/dataset_mcar_xx_trialy/tabddpm_impute/downstream_metrics.json`
+    
+
+----------
+
+## Typical command order
+
+If you are running everything manually, the order is:
+
+```bash
+PYTHONPATH=. python convert_to_tabddpm_impute_from_original.py
+python exp.py
+
+PYTHONPATH=. python scripts/pipeline.py --config exp/dataset_mcar_10_trial1/config.toml --train
+PYTHONPATH=. python scripts/impute.py --config exp/dataset_mcar_10_trial1/config.toml --split train
+PYTHONPATH=. python scripts/impute.py --config exp/dataset_mcar_10_trial1/config.toml --split val
+PYTHONPATH=. python scripts/impute.py --config exp/dataset_mcar_10_trial1/config.toml --split test
+PYTHONPATH=. python evaluate_imputation.py --dataset dataset_mcar_10_trial1
+PYTHONPATH=. python evaluate_downstream.py --dataset dataset_mcar_10_trial1
+
+PYTHONPATH=. python summarize_trials.py
+
+```
+
+----------
+
+## Troubleshooting
+
+### `ModuleNotFoundError` for `sample`, `eval_catboost`, `eval_mlp`, or `eval_simple`
+
+`pipeline.py` may still import these helper files at startup. Keep these files inside `scripts/` unless you have already cleaned up the imports in `pipeline.py`.
+
+### Training ran before, but no new loss is printed
+
+If `scripts/pipeline.py --train` crashes and `scripts/impute.py` still runs afterward, then imputation may be using an old saved model. Check the training log first.
+
+### Only a warning is printed about `pkg_resources`
+
+This is usually just a warning, not a fatal error.
+
+### Want to monitor a running experiment
+
+Use:
+
+```bash
+pgrep -af "pipeline.py|impute.py|evaluate_imputation.py|evaluate_downstream.py"
+
+```
+
+and for logs:
+
+```bash
+tail -f /path/to/logfile.log
+
+```
+
+----------
+
+## Minimal quick start
+
+If your CSV files are already in place and you want to test one dataset quickly:
+
+```bash
+conda activate tddpm
+cd /path/to/tabddpm-imputation
+
+PYTHONPATH=. python convert_to_tabddpm_impute_from_original.py
+python exp.py
+
+PYTHONPATH=. python scripts/pipeline.py --config exp/dataset_mcar_10_trial1/config.toml --train
+PYTHONPATH=. python scripts/impute.py --config exp/dataset_mcar_10_trial1/config.toml --split train
+PYTHONPATH=. python scripts/impute.py --config exp/dataset_mcar_10_trial1/config.toml --split val
+PYTHONPATH=. python scripts/impute.py --config exp/dataset_mcar_10_trial1/config.toml --split test
+PYTHONPATH=. python evaluate_imputation.py --dataset dataset_mcar_10_trial1
+PYTHONPATH=. python evaluate_downstream.py --dataset dataset_mcar_10_trial1
+
+```
+
+If you want to run all datasets instead:
+
+```bash
+bash run_all_datasets.sh
+
+```
+
+```
+::contentReference[oaicite:1]{index=1}
+
 ```

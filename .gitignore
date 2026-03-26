@@ -1,4 +1,6 @@
+
 .DS_Store
+._*
 __pycache__/
 
 # Python
@@ -6,37 +8,40 @@ __pycache__/
 *.pyo
 *.pyd
 
-# notebooks
-**/**.ipynb
-!agg_results.ipynb
+
 
 # data / outputs
-**/**.npy
-**/**.gz
-**/**.tar
-**/**.obj
-**/**.pt
-**/**.pth
-**/**.png
-**/**.ckpt
+**/*.npy
+**/*.gz
+**/*.tar
+**/*.obj
+**/*.pt
+**/*.pth
+**/*.png
+**/*.ckpt
+
+# keep dataset CSVs in data/, ignore everything else there
+data/**/*
+!data/**/
+!data/**/*.csv
 
 # scripts / misc
-**/**.code-workspace
+**/*.code-workspace
 
 # experiment outputs
-exp/**/**/results_catboost.json
-exp/**/**/results_mlp.json
-exp/**/**/check/
-exp/**/**/many-exps/
+exp/**/results_catboost.json
+exp/**/results_mlp.json
+exp/**/check/
+exp/**/many-exps/
+exp/**/loss.csv
 runs/
 results/
 outputs/
 logs/
 wandb/
 
-# local configs / datasets
-configs/
-data/
+# local configs
+# configs/
 
 # environments
 .env
@@ -53,3 +58,5 @@ conda-meta/
 *.db
 *.sqlite
 *.sqlite3
+
+summary_results/*.csv
