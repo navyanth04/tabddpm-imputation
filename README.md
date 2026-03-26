@@ -468,7 +468,3 @@ bash run_all_datasets.sh
 
 ```
 
-```
-::contentReference[oaicite:1]{index=1}
-
-```
